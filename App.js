@@ -35,6 +35,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 8,
   },
+  centeredText: {
+    textAlign: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
+  listHeader: {
+    backgroundColor: '#333',
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  listHeaderText: {
+    fontSize: 24,
+    textAlign: 'center',
+    color: '#FEFEFE',
+  },
 });
 export default function App() {
   const [user, setUser] = useState('');
@@ -43,14 +58,7 @@ export default function App() {
       <View style={styles.container}>
         <SearchBar onChangeText={setUser} />
         {user === '' ? (
-          <Text
-            style={{
-              textAlign: 'center',
-              marginTop: 'auto',
-              marginBottom: 'auto',
-            }}>
-            Search something
-          </Text>
+          <Text style={styles.centeredText}>Search something</Text>
         ) : (
           <RepoList user={user} />
         )}
@@ -96,6 +104,7 @@ const RepoList = ({user}) => {
   const [data, setData] = useState({state: STATE.LOADING, data: []});
 
   useEffect(() => {
+    setData({state: STATE.LOADING, data: []});
     const timeoutId = setTimeout(() => fetchRepos(), 1_000);
     return () => clearTimeout(timeoutId);
   }, [user]);
@@ -103,11 +112,15 @@ const RepoList = ({user}) => {
   function fetchRepos() {
     console.log(TAG, 'fetchRepos()', `Fetching repos for: ${user}`);
     api.get(`/users/${user}/repos`).then(response => {
-      const repoNames = response.data.map(element => ({
-        id: element.id,
-        name: element.name,
-      }));
-      setData({state: 'DONE', data: repoNames});
+      let repos = [];
+      if (response.status !== 404)
+        repos = response.data.map(element => ({
+          id: element.id,
+          name: element.name,
+        }));
+
+      const state = response.status === 404 ? STATE.ERROR : STATE.DONE;
+      setData({state: state, data: repos});
     });
   }
 
@@ -123,14 +136,30 @@ const RepoList = ({user}) => {
   function separator() {
     return <View style={{height: 10}} />;
   }
-  return data.state === STATE.LOADING ? (
-    <Text>Loading</Text>
-  ) : (
-    <FlatList
-      data={data.data}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
-      ItemSeparatorComponent={separator}
-    />
-  );
+
+  function header() {
+    return <Text style={styles.listHeaderText}>{user}</Text>;
+  }
+  switch (data.state) {
+    case STATE.DONE: {
+      return (
+        <FlatList
+          ListHeaderComponent={header()}
+          ListHeaderComponentStyle={styles.listHeader}
+          data={data.data}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          ItemSeparatorComponent={separator}
+        />
+      );
+    }
+
+    case STATE.LOADING: {
+      return <Text style={styles.centeredText}>Loading ...</Text>;
+    }
+
+    case STATE.ERROR: {
+      return <Text style={styles.centeredText}>Not Found</Text>;
+    }
+  }
 };
